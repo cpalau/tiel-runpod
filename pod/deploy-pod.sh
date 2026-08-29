@@ -16,13 +16,12 @@ else echo "ERROR: falta RUNPOD_API_KEY. Ver KEYS.md"; exit 1; fi
 PAYLOAD=$(cat <<JSON
 {
   "name": "tiel-coder-pod",
-  "imageName": "greyul/runpod-llama-cpp-cuda:latest",
-  "gpuTypeId": "${GPU_TYPE}",
-  "dataCenterId": "${DC_ID}",
-  "containerDiskInGb": 20,
-  "volumeId": "${VOL_ID}",
-  "volumeMountPath": "/runpod-volume",
-  "ports": "8080/http,22/tcp",
+  "image": "greyul/runpod-llama-cpp-cuda:latest",
+  "gpu": { "id": "${GPU_TYPE}", "count": 1 },
+  "dataCenterIds": ["${DC_ID}"],
+  "disk": 20,
+  "mounts": { "network": [{ "volumeId": "${VOL_ID}", "path": "/runpod-volume" }] },
+  "ports": ["8080/http", "22/tcp"],
   "env": {
     "HF_REPO": "peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF",
     "HF_FILE": "Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf",

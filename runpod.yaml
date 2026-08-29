@@ -33,18 +33,18 @@ serverless:
 
 # ── Pod (alternativa 24/7) ─────────────────────────────────────────
 # Pod no usa eniewold (serverless handler). Para Pod usa imagen greyul o llama.cpp directa.
+# API real: POST /v2/pods {name, image, gpu:{id,count}, disk, ports:[], mounts:{network:[]}, dataCenterIds:[], env}
 pod:
   name: tiel-coder-pod
   # Opción Pod 1: greyul (probada, simple, OpenAI en 8080)
   image: greyul/runpod-llama-cpp-cuda:latest
   # Opción Pod 2: ghcr.io/ggml-org/llama.cpp:server-cuda + manual llama-server
-  gpuTypeId: NVIDIA A100-SXM4-80GB  # $1.59/h MEDIUM — 80GB para 262k holgado
+  gpu: { id: NVIDIA A100-SXM4-80GB, count: 1 }  # $1.59/h MEDIUM — 80GB para 262k holgado
   # Alternativas Pod: NVIDIA A40 ($0.44/h, 48GB snug), NVIDIA RTX PRO 6000 Blackwell Server Edition ($2.09/h, 96GB HIGH)
-  dataCenterId: EU-RO-1
-  containerDiskInGb: 20
-  volumeId: l1lelwqilk
-  volumeMountPath: /runpod-volume
-  ports: "8080/http,22/tcp"
+  dataCenterIds: [EU-RO-1]
+  disk: 20
+  mounts: { network: [{ volumeId: l1lelwqilk, path: /runpod-volume }] }
+  ports: ["8080/http", "22/tcp"]
   env:
     HF_REPO: peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF
     HF_FILE: Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf
