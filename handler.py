@@ -1,6 +1,6 @@
 """
 Runpod Serverless handler for Tiel-Coder-35B-A3B GGUF.
-Optimizado: flash-attn, split-mode 2 (MoE), cache quant q8_0, streaming, OpenAI-compatible.
+Conservador: flags mínimos según ficha oficial del modelo.
 """
 import os
 import time
@@ -9,7 +9,7 @@ import threading
 import requests
 import runpod
 
-# ── Configuración ───────────────────────────────────────────────────
+# ── Configuración (coincide con ficha HF del modelo) ────────────────
 MODEL_URL = os.environ.get(
     "MODEL_URL",
     "https://huggingface.co/peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF/resolve/main/Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf",
@@ -20,11 +20,8 @@ MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILENAME)
 CONTEXT_LENGTH = os.environ.get("CONTEXT_LENGTH", "262144")
 LLAMA_PORT = os.environ.get("LLAMA_SERVER_PORT", "8000")
 MODEL_NAME = os.environ.get("MODEL_NAME", "Tiel-Coder-35B-A3B-UD-Q4_K_XL")
-FLASH_ATTENTION = os.environ.get("FLASH_ATTENTION", "1")
-SPLIT_MODE = os.environ.get("SPLIT_MODE", "2")
-CACHE_QUANTIZATION = os.environ.get("CACHE_QUANTIZATION", "q8_0")
-MAX_NUM_SEQS = os.environ.get("MAX_NUM_SEQS", "4")
-LLAMA_EXTRA_ARGS = os.environ.get("LLAMA_EXTRA_ARGS", "--flash-attn --split-mode 2")
+# Flags del modelo: solo -ngl 99 --jinja. No usar --flash-attn (híbrido SSM/attention)
+LLAMA_EXTRA_ARGS = os.environ.get("LLAMA_EXTRA_ARGS", "")
 
 LLAMA_URL = f"http://127.0.0.1:{LLAMA_PORT}"
 llama_proc = None
@@ -72,14 +69,6 @@ def start_llama_server():
         "--metrics",
         "-ngl", "99",
     ]
-    if FLASH_ATTENTION == "1":
-        cmd.append("--flash-attn")
-    if SPLIT_MODE:
-        cmd.extend(["--split-mode", SPLIT_MODE])
-    if CACHE_QUANTIZATION:
-        cmd.extend(["--cache-type-k", CACHE_QUANTIZATION, "--cache-type-v", CACHE_QUANTIZATION])
-    if MAX_NUM_SEQS:
-        cmd.extend(["--parallel", MAX_NUM_SEQS])
     if LLAMA_EXTRA_ARGS:
         cmd.extend(LLAMA_EXTRA_ARGS.split())
     log(f"Starting llama-server: {' '.join(cmd)}")
