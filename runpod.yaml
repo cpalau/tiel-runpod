@@ -1,49 +1,52 @@
-# Runpod Serverless Endpoint Config - Tiel-Coder-35B-A3B UD-Q4_K_XL
-# Crea el endpoint en console.runpod.io con estos valores
+# Runpod — Tiel-Coder-35B-A3B UD-Q4_K_XL 22.4GB (greyul)
+# Imagen pre-hecha: greyul/runpod-llama-cpp-cuda:latest — ya trae llama-server + CUDA
+# No hay build custom. El modelo se descarga a /runpod-volume y queda cacheado.
 
-name: tiel-coder-q4xl
-type: QUEUE
+# ── Serverless ──────────────────────────────────────────────────────
+serverless:
+  name: tiel-coder-q4xl
+  type: QUEUE
+  image: greyul/runpod-llama-cpp-cuda:latest
+  gpu_pools:
+    - AMPERE_80      # A100 80GB  $2.72/h serverless
+    - BLACKWELL_96   # RTX PRO 6000 96GB $3.49/h
+    - ADA_80_PRO     # H100 80GB $4.79/h
+  workers_min: 0          # scale-to-zero: $0 idle
+  workers_max: 2
+  idle_timeout: 5
+  scaler_type: QUEUE_DELAY
+  scaler_value: 2         # 2s queue delay (más rápido que default 4)
+  container_disk: 60
+  network_volume: l1lelwqilk   # tiel-models 100GB EU-RO-1 (ya creado)
+  flashboot: FLASHBOOT
+  timeout: 600000
+  env:
+    HF_REPO: peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF
+    HF_FILE: Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf
+    MODELS_DIR: /runpod-volume/models
+    LLAMA_ARG_HOST: "0.0.0.0"
+    LLAMA_ARG_PORT: "8080"
+    LLAMA_ARGS: "-ngl 99 --jinja --context-size 262144"
+    # Para YaRN 1M: "-ngl 99 --jinja --context-size 1048576 --rope-scaling yarn --rope-freq-base 1000000 --yarn-orig-ctx 262144"
 
-# GPU: A100 80GB (principal) + fallback RTX PRO 6000 96GB + H100 80GB
-gpu_types:
-  - AMPERE_80        # A100 80GB ($2.74/h activo)
-  - ADA_6000_PRO     # RTX PRO 6000 96GB ($4.00/h)
-  - HOPPER_80        # H100 80GB ($4.18/h)
-
-# Workers
-workers_min: 0          # Scale-to-zero: $0 idle
-workers_max: 2          # Máximo 2 workers en paralelo
-idle_timeout: 5         # 5s antes de scale-down
-
-# Auto-scaling
-scaler_type: QUEUE_DELAY
-scaler_value: 2         # 2s queue delay threshold (más rápido que default 4)
-
-# Storage
-container_disk: 60      # 60GB para modelo + CUDA + handler
-network_volume: /runpod-volume  # Persistent storage para modelo
-
-# FlashBoot: cold start rápido
-flashboot: FLASHBOOT
-
-# Timeout por request
-timeout: 600000         # 600s (10min) para requests largos
-
-# Environment variables
-env:
-  MODEL_URL: https://huggingface.co/peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF/resolve/main/Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf
-  MODEL_FILENAME: Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf
-  MODEL_DIR: /runpod-volume
-  MODEL_NAME: Tiel-Coder-35B-A3B-UD-Q4_K_XL
-  CONTEXT_LENGTH: "262144"
-  LLAMA_SERVER_PORT: "8000"
-  FLASH_ATTENTION: "1"
-  SPLIT_MODE: "2"
-  CACHE_QUANTIZATION: q8_0
-  MAX_NUM_SEQS: "4"
-  LLAMA_EXTRA_ARGS: "--flash-attn --split-mode 2"
-
-# Build
-github_repo: cpalau/tiel-runpod
-github_branch: main
-dockerfile_path: Dockerfile
+# ── Pod (alternativa 24/7) ─────────────────────────────────────────
+pod:
+  name: tiel-coder-pod
+  image: greyul/runpod-llama-cpp-cuda:latest
+  # GPU Pod: elige uno (product=POD, gpuTypeId, no pool)
+  # Recomendado: A100-SXM4-80GB  $1.59/h MEDIUM  (80GB para 262k holgado)
+  # Premium:     RTX PRO 6000 Blackwell 96GB $2.09/h HIGH (para 1M YaRN)
+  # Económico:   A40 48GB $0.44/h HIGH (snug para 262k)
+  gpuTypeId: NVIDIA A100-SXM4-80GB
+  dataCenterId: EU-RO-1
+  containerDiskInGb: 20
+  volumeId: l1lelwqilk
+  volumeMountPath: /runpod-volume
+  ports: "8080/http,22/tcp"
+  env:
+    HF_REPO: peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF
+    HF_FILE: Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf
+    MODELS_DIR: /runpod-volume/models
+    LLAMA_ARG_HOST: "0.0.0.0"
+    LLAMA_ARG_PORT: "8080"
+    LLAMA_ARGS: "-ngl 99 --jinja --context-size 262144"
