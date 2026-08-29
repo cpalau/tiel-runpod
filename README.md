@@ -6,7 +6,7 @@ Base: **[eniewold/llama-cpp-runpod](https://github.com/eniewold/llama-cpp-runpod
 ## Modelo
 
 - 35B MoE (256 expertos, 8 activos/token), híbrido SSM/attention, 2 KV heads → cache pequeño.
-- Sampling: `temperature 1.0, top_p 0.95, top_k 20` (default). Para coding agéntico `temperature 0.6`.
+- **Sampling verificado (ficha HF):** `temperature 1.0, top_p 0.95, top_k 20` (default). **Para coding agéntico `temperature 0.6`** — así se evaluó en el paper (12/25 fixes, nivel Opus 4.6). Está ya fijado en `opencode.json` (`options.temperature=0.6`) y se pasa por request (`{"temperature":0.6,"top_p":0.95,"top_k":20}`); no hace falta tocar `LLAMA_SERVER_CMD_ARGS`.
 - Chat template Sharp dentro del GGUF → se aplica solo con `--jinja` (lo hace `llama-server` vía `LLAMA_ARG_*`).
 - Contexto nativo **262144 tokens** (256k). Extensible a 1M con YaRN.
 - Fits: `22.4GB snug 24GB, comfy 32GB` — con 262k necesitas 80GB para holgado.
@@ -39,22 +39,28 @@ Pay-per-second, `$0` idle con `workers_min=0`. Cold start descarga 22.4GB a volu
 mkdir -p ~/.secrets && echo -n "tu-key" > ~/.secrets/runpod_api_key && chmod 600 ~/.secrets/runpod_api_key
 export RUNPOD_API_KEY="$(cat ~/.secrets/runpod_api_key)"
 
-# 2. Deploy (lee runpod.yaml, usa imagen cpalau/tiel-runpod:eniewold)
+# 2. Deploy — 2 opciones:
+# A) Más rápido: Runpod Console → Hub → eniewold/llama-cpp-runpod → Deploy
+#    pon env: LLAMA_ARG_HF_REPO=peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF
+#            LLAMA_HF_QUANT=UD-Q4_K_XL, LLAMA_ARG_CTX_SIZE=262144
+# B) Desde tu fork (este repo, ya parcheado para Tiel):
+#    Console → Serverless → New Endpoint → Import Git Repository → cpalau/tiel-runpod
+#    o vía API (requiere que la imagen exista en Docker Hub):
 ./deploy.sh
 # → crea endpoint tiel-coder-q4xl, A100 80GB + fallback, volumen l1lelwqilk
 
-# 3. Test (eniewold acepta 3 formatos)
+# 3. Test (eniewold acepta 3 formatos — siempre con temperature 0.6 para coding)
 curl -X POST https://api.runpod.ai/v2/$ENDPOINT_ID/runsync \
  -H "Authorization: Bearer $RUNPOD_API_KEY" -H "Content-Type: application/json" \
- -d '{"input":{"messages":[{"role":"user","content":"Escribe is_prime(n) en python"}],"temperature":0.6,"max_tokens":200}}' --max-time 120
+ -d '{"input":{"messages":[{"role":"user","content":"Escribe is_prime(n) en python"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":200}}' --max-time 120
 
 # OpenAI route directo:
 curl -X POST https://api.runpod.ai/v2/$ENDPOINT_ID/runsync \
  -H "Authorization: Bearer $RUNPOD_API_KEY" -H "Content-Type: application/json" \
- -d '{"input":{"openai_route":"/v1/chat/completions","openai_input":{"model":"any","messages":[{"role":"user","content":"hola"}],"temperature":0.6,"max_tokens":100}}}'
+ -d '{"input":{"openai_route":"/v1/chat/completions","openai_input":{"model":"any","messages":[{"role":"user","content":"hola"}],"temperature":0.6,"top_p":0.95,"top_k":20,"max_tokens":100}}}'
 ```
 
-O manual en Console: `Serverless → New Endpoint → Import Git Repository → cpalau/tiel-runpod` → env de `runpod.yaml` sección `serverless`.
+O manual en Console: `Serverless → New Endpoint → Import Git Repository → cpalau/tiel-runpod` → env de `runpod.yaml` sección `serverless`. **No pongas `LLAMA_SERVER_CMD_ARGS=--temp`**: el sampling se manda por request y ya está en `opencode.json`.
 
 **Variables eniewold para Tiel:**
 ```

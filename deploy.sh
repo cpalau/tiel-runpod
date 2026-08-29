@@ -9,6 +9,11 @@ if [ -n "$RUNPOD_API_KEY" ]; then KEY="$RUNPOD_API_KEY"
 elif [ -f ~/.secrets/runpod_api_key ]; then KEY="$(cat ~/.secrets/runpod_api_key | tr -d '\n')"
 else echo "ERROR: falta RUNPOD_API_KEY. Ver KEYS.md"; exit 1; fi
 
+# Nota: este endpoint se buildea desde GitHub cpalau/tiel-runpod (Dockerfile eniewold).
+# En Runpod Console: Serverless → New Endpoint → Import Git Repository → cpalau/tiel-runpod
+# La API con "image" requiere que la imagen exista en Docker Hub; para GitHub usa la Console.
+# Alternativa rápida sin tu repo: usa el template Hub eniewold/llama-cpp-runpod y pon las env de abajo.
+
 VOL_ID="l1lelwqilk"  # tiel-models 100GB EU-RO-1
 
 PAYLOAD=$(cat <<JSON
