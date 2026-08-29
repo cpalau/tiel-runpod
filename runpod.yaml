@@ -1,23 +1,17 @@
-# Runpod — Tiel-Coder-35B-A3B UD-Q4_K_XL 22.4GB (eniewold base)
-# Base: https://github.com/eniewold/llama-cpp-runpod (ghcr.io/ggml-org/llama.cpp:server-cuda)
-# Imagen Docker se buildea desde ./Dockerfile + ./src (no hay pull de ghcr directo)
-
-# ── Serverless (eniewold) ─────────────────────────────────────────
+# Runpod — Tiel-Coder-35B-A3B UD-Q4_K_XL 22.4GB (eniewold base serverless + greyul pod)
+# Serverless: eniewold (ghcr latest, 262k, Qwen3.8 ready) — Pod: greyul (HF download, 262k)
 serverless:
   name: tiel-coder-q4xl
   type: QUEUE
   image: cpalau/tiel-runpod:eniewold
-  gpu_pools:
-    - AMPERE_80      # A100 80GB  $2.72/h serverless
-    - BLACKWELL_96   # RTX PRO 6000 96GB $3.49/h
-    - ADA_80_PRO     # H100 80GB $4.79/h
-  workers_min: 0          # scale-to-zero: $0 idle
+  gpu_pools: [AMPERE_80, BLACKWELL_96, ADA_80_PRO]
+  workers_min: 0
   workers_max: 2
   idle_timeout: 5
   scaler_type: QUEUE_DELAY
   scaler_value: 2
   container_disk: 60
-  network_volume: l1lelwqilk   # tiel-models 100GB EU-RO-1 (ya creado)
+  network_volume: l1lelwqilk
   flashboot: FLASHBOOT
   timeout: 600000
   env:
@@ -28,13 +22,16 @@ serverless:
     LLAMA_ARG_N_GPU_LAYERS: "999"
     LLAMA_ARG_N_CPU_MOE: "0"
     LLAMA_ARG_FLASH_ATTN: auto
-    # Para YaRN 1M: LLAMA_ARG_CTX_SIZE=1048576 + LLAMA_SERVER_CMD_ARGS=--rope-scaling yarn ...
-
-# ── Pod (24/7, sin cold start) ──────────────────────────────────────
 pod:
   name: tiel-coder-pod
-  image: ghcr.io/ggml-org/llama.cpp:server-cuda  # latest oficial, siempre qwen35moe/Qwen3.8 ready
-  gpu: { id: NVIDIA A100-SXM4-80GB, count: 1 }  # $1.59/h — 80GB para 262k holgado
+  image: greyul/runpod-llama-cpp-cuda:latest
+  gpu: { id: NVIDIA A100-SXM4-80GB, count: 1 }
   disk: 60
   ports: ["8080/http", "22/tcp"]
-  args: "--hf-repo peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF:UD-Q4_K_XL --host 0.0.0.0 --port 8080 --ctx-size 262144 -ngl 99 --jinja"
+  env:
+    HF_REPO: peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF
+    HF_FILE: Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf
+    MODELS_DIR: /workspace/models
+    LLAMA_ARG_HOST: "0.0.0.0"
+    LLAMA_ARG_PORT: "8080"
+    LLAMA_ARGS: "-ngl 99 --jinja --ctx-size 262144"
