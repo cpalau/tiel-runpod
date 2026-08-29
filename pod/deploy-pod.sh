@@ -17,7 +17,8 @@ PAYLOAD=$(cat <<JSON
   "gpu": { "id": "${GPU_TYPE}", "count": 1 },
   "disk": 60,
   "ports": ["8080/http", "22/tcp"],
-  "args": "--hf-repo peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF:UD-Q4_K_XL --host 0.0.0.0 --port 8080 --ctx-size 262144 -ngl 99 --jinja"
+  "args": "--hf-repo peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF:UD-Q4_K_XL --host 0.0.0.0 --port 8080 --ctx-size 262144 -ngl 99 --jinja",
+  "startSsh": true
 }
 JSON
 )
