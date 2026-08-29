@@ -1,0 +1,6 @@
+.git
+.gitignore
+README.md
+models/
+*.gguf
+__pycache__
