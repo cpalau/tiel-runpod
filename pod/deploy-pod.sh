@@ -13,7 +13,7 @@ else echo "ERROR: falta RUNPOD_API_KEY. Ver KEYS.md"; exit 1; fi
 PAYLOAD=$(cat <<JSON
 {
   "name": "tiel-coder-pod",
-  "image": "greyul/runpod-llama-cpp-cuda:latest",
+  "image": "shennguyenrs/llama-cpp-server-cuda12:b9994",
   "gpu": { "id": "${GPU_TYPE}", "count": 1 },
   "disk": 60,
   "ports": ["8080/http", "22/tcp"],
@@ -23,13 +23,13 @@ PAYLOAD=$(cat <<JSON
     "MODELS_DIR": "/workspace/models",
     "LLAMA_ARG_HOST": "0.0.0.0",
     "LLAMA_ARG_PORT": "8080",
-    "LLAMA_ARGS": "-ngl 99 --jinja --ctx-size 262144"
+    "LLAMA_ARGS": "-ngl 99 --jinja --ctx-size 262144 --flash-attn auto --cache-type-k q8_0 --cache-type-v q8_0"
   }
 }
 JSON
 )
 
-echo "Creando Pod tiel-coder-pod con ${GPU_TYPE} (greyul, disk 60GB, port 8080, --ctx-size fix)..."
+echo "Creando Pod tiel-coder-pod con ${GPU_TYPE} (shennguyenrs b9994, 1 mes, disk 60GB, port 8080)..."
 RESP=$(curl -s -X POST https://api.runpod.io/v2/pods \
   -H "Authorization: Bearer ${KEY}" -H "Content-Type: application/json" -d "$PAYLOAD")
 

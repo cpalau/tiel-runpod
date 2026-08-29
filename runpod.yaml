@@ -33,9 +33,11 @@ serverless:
 # ── Pod (24/7, sin cold start) ──────────────────────────────────────
 pod:
   name: tiel-coder-pod
-  image: greyul/runpod-llama-cpp-cuda:latest
+  image: shennguyenrs/llama-cpp-server-cuda12:b9994  # 1 mes, Qwen3.6 35B optimizado, CUDA 12, 204k default
+  # Alternativa oficial siempre latest: ghcr.io/ggml-org/llama.cpp:server-cuda
+  # Anterior: greyul/runpod-llama-cpp-cuda:latest (5 meses, obsoleto)
   gpu: { id: NVIDIA A100-SXM4-80GB, count: 1 }  # $1.59/h — 80GB para 262k holgado
-  disk: 60
+  disk: 60  # 60GB para GGUF 22.4GB + cache, sin network volume (EU-RO-1 sin stock A100)
   ports: ["8080/http", "22/tcp"]
   env:
     HF_REPO: peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF
@@ -43,4 +45,4 @@ pod:
     MODELS_DIR: /workspace/models
     LLAMA_ARG_HOST: "0.0.0.0"
     LLAMA_ARG_PORT: "8080"
-    LLAMA_ARGS: "-ngl 99 --jinja --ctx-size 262144"
+    LLAMA_ARGS: "-ngl 99 --jinja --ctx-size 262144 --flash-attn auto --cache-type-k q8_0 --cache-type-v q8_0"
