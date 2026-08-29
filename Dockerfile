@@ -1,7 +1,6 @@
-# Official llama.cpp server image. The digest pin is managed automatically by
-# .github/workflows/latest-llamacpp.yml, which follows the floating
-# server-cuda tag and cuts a release named after the llama.cpp build number.
-FROM ghcr.io/ggml-org/llama.cpp:server-cuda@sha256:952424b09abc18668a9891041b275bf8c96afb6107d65d33ba104da9b18490c7
+# Official llama.cpp server image — latest (no digest pin, siempre master)
+# Antes: server-cuda@sha256:9524... (b8882). Ahora latest para Qwen3.8/qwen35moe sin lag.
+FROM ghcr.io/ggml-org/llama.cpp:server-cuda
 
 ENV PYTHONUNBUFFERED=1
 
