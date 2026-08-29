@@ -15,7 +15,6 @@ else
   exit 1
 fi
 
-# Verifica key
 if [ ${#KEY} -lt 20 ]; then echo "Key parece corta"; exit 1; fi
 
 echo "Creando Network Volume (si no existe)..."
@@ -29,27 +28,33 @@ echo "VOL_ID=$VOL_ID"
 
 echo ""
 echo "Creando endpoint serverless (GitHub cpalau/tiel-runpod)..."
-# Nota: la API de templates/endpoint ha cambiado; si falla, usa la consola web (recomendado para novato)
-# Este payload es best-effort basado en docs.runpod.io/serverless
 PAYLOAD=$(cat <<JSON
 {
   "name": "tiel-coder-q4xl",
-  "templateId": null,
-  "gpuIds": "AMPERE_80,A6000,ADA_6000_PRO",
+  "type": "QUEUE",
+  "gpuTypeIds": ["AMPERE_80", "ADA_6000_PRO", "HOPPER_80"],
   "workersMin": 0,
   "workersMax": 2,
   "idleTimeout": 5,
   "scalerType": "QUEUE_DELAY",
-  "scalerValue": 4,
+  "scalerValue": 2,
   "containerDiskInGb": 60,
   "volumeMountPath": "/runpod-volume",
   "networkVolumeId": "$VOL_ID",
+  "flashboot": "FLASHBOOT",
+  "timeout": 600000,
   "env": {
     "MODEL_URL": "https://huggingface.co/peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF/resolve/main/Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf",
     "MODEL_FILENAME": "Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf",
     "MODEL_DIR": "/runpod-volume",
+    "MODEL_NAME": "Tiel-Coder-35B-A3B-UD-Q4_K_XL",
     "CONTEXT_LENGTH": "262144",
-    "MODEL_NAME": "Tiel-Coder-35B-A3B-UD-Q4_K_XL"
+    "LLAMA_SERVER_PORT": "8000",
+    "FLASH_ATTENTION": "1",
+    "SPLIT_MODE": "2",
+    "CACHE_QUANTIZATION": "q8_0",
+    "MAX_NUM_SEQS": "4",
+    "LLAMA_EXTRA_ARGS": "--flash-attn --split-mode 2"
   },
   "githubRepo": "cpalau/tiel-runpod",
   "githubBranch": "main",
@@ -59,7 +64,6 @@ JSON
 )
 echo "$PAYLOAD" | python3 -m json.tool | head -n 50
 
-# Intento crear - endpoint v2
 RESP=$(curl -s -X POST https://api.runpod.io/v2/endpoints \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d "$PAYLOAD" || true)
@@ -72,14 +76,13 @@ if [ -n "$EP_ID" ]; then
   echo ""
   echo "ENDPOINT_ID=$EP_ID"
   echo "Actualizando opencode.json..."
-  # Actualiza baseURL en opencode.json si existe placeholder
   python3 <<PY
 import json, pathlib
 p = pathlib.Path.home() / ".config/opencode/opencode.json"
 j = json.loads(p.read_text())
-j["provider"]["runpod-tiel"]["options"]["baseURL"] = f"https://api.runpod.ai/v2/{'$EP_ID'}/openai/v1"
+j["provider"]["runpod-tiel"]["options"]["baseURL"] = f"https://api.runpod.ai/v2/$EP_ID/openai/v1"
 p.write_text(json.dumps(j, indent=2))
-print(f"Actualizado baseURL a https://api.runpod.ai/v2/{'$EP_ID'}/openai/v1")
+print(f"Actualizado baseURL a https://api.runpod.ai/v2/$EP_ID/openai/v1")
 PY
   echo "Hecho. Prueba: curl -H \"Authorization: Bearer \$KEY\" https://api.runpod.ai/v2/$EP_ID/openai/v1/models"
 else

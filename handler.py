@@ -1,8 +1,6 @@
 """
 Runpod Serverless handler for Tiel-Coder-35B-A3B GGUF.
-- Downloads GGUF to /runpod-volume on first boot (cached thereafter)
-- Starts llama-server (OpenAI-compatible) on 127.0.0.1:8000
-- Proxies both Runpod queue format and Runpod's /openai/v1/* to llama-server
+Optimizado: flash-attn, split-mode 2 (MoE), cache quant q8_0, streaming, OpenAI-compatible.
 """
 import os
 import time
@@ -11,6 +9,7 @@ import threading
 import requests
 import runpod
 
+# ── Configuración ───────────────────────────────────────────────────
 MODEL_URL = os.environ.get(
     "MODEL_URL",
     "https://huggingface.co/peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF/resolve/main/Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf",
@@ -21,9 +20,13 @@ MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILENAME)
 CONTEXT_LENGTH = os.environ.get("CONTEXT_LENGTH", "262144")
 LLAMA_PORT = os.environ.get("LLAMA_SERVER_PORT", "8000")
 MODEL_NAME = os.environ.get("MODEL_NAME", "Tiel-Coder-35B-A3B-UD-Q4_K_XL")
+FLASH_ATTENTION = os.environ.get("FLASH_ATTENTION", "1")
+SPLIT_MODE = os.environ.get("SPLIT_MODE", "2")
+CACHE_QUANTIZATION = os.environ.get("CACHE_QUANTIZATION", "q8_0")
+MAX_NUM_SEQS = os.environ.get("MAX_NUM_SEQS", "4")
+LLAMA_EXTRA_ARGS = os.environ.get("LLAMA_EXTRA_ARGS", "--flash-attn --split-mode 2")
 
 LLAMA_URL = f"http://127.0.0.1:{LLAMA_PORT}"
-download_lock = threading.Lock()
 llama_proc = None
 
 
@@ -34,11 +37,11 @@ def log(msg: str):
 def download_model_if_needed():
     os.makedirs(MODEL_DIR, exist_ok=True)
     if os.path.exists(MODEL_PATH) and os.path.getsize(MODEL_PATH) > 1024 * 1024 * 100:
-        log(f"Model already cached: {MODEL_PATH} ({os.path.getsize(MODEL_PATH) / 1e9:.2f} GB)")
+        log(f"Model cached: {MODEL_PATH} ({os.path.getsize(MODEL_PATH) / 1e9:.2f} GB)")
         return
-    log(f"Downloading model to {MODEL_PATH} ...")
-    log(f"URL: {MODEL_URL}")
-    # Use curl with resume; fallback to python requests
+    log(f"Downloading {MODEL_URL} -> {MODEL_PATH}")
+    hf_token = os.environ.get("HF_TOKEN", "")
+    headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
     try:
         subprocess.run(
             ["curl", "-L", "--fail", "--retry", "3", "--retry-delay", "5",
@@ -46,11 +49,7 @@ def download_model_if_needed():
             check=True,
         )
         os.rename(MODEL_PATH + ".tmp", MODEL_PATH)
-        log(f"Download complete: {os.path.getsize(MODEL_PATH) / 1e9:.2f} GB")
-    except Exception as e:
-        log(f"curl failed ({e}), trying python download...")
-        hf_token = os.environ.get("HF_TOKEN", "")
-        headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
+    except Exception:
         with requests.get(MODEL_URL, headers=headers, stream=True, timeout=300) as r:
             r.raise_for_status()
             with open(MODEL_PATH + ".tmp", "wb") as f:
@@ -58,7 +57,7 @@ def download_model_if_needed():
                     if chunk:
                         f.write(chunk)
         os.rename(MODEL_PATH + ".tmp", MODEL_PATH)
-        log(f"Download complete (python): {os.path.getsize(MODEL_PATH) / 1e9:.2f} GB")
+    log(f"Downloaded: {os.path.getsize(MODEL_PATH) / 1e9:.2f} GB")
 
 
 def start_llama_server():
@@ -72,15 +71,19 @@ def start_llama_server():
         "--jinja",
         "--metrics",
         "-ngl", "99",
-        # sampling defaults from model card: temp 1.0 top_p 0.95 top_k 20, but allow override per request
     ]
-    # Allow extra args via env
-    extra = os.environ.get("LLAMA_EXTRA_ARGS", "")
-    if extra:
-        cmd.extend(extra.split())
+    if FLASH_ATTENTION == "1":
+        cmd.append("--flash-attn")
+    if SPLIT_MODE:
+        cmd.extend(["--split-mode", SPLIT_MODE])
+    if CACHE_QUANTIZATION:
+        cmd.extend(["--cache-type-k", CACHE_QUANTIZATION, "--cache-type-v", CACHE_QUANTIZATION])
+    if MAX_NUM_SEQS:
+        cmd.extend(["--parallel", MAX_NUM_SEQS])
+    if LLAMA_EXTRA_ARGS:
+        cmd.extend(LLAMA_EXTRA_ARGS.split())
     log(f"Starting llama-server: {' '.join(cmd)}")
     llama_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-    # Stream logs in background
     def stream():
         for line in llama_proc.stdout:
             print(f"[llama-server] {line}", end="", flush=True)
@@ -96,7 +99,6 @@ def wait_for_llama(timeout=300):
             if r.status_code == 200:
                 log("llama-server ready")
                 return True
-            # llama-server also exposes /v1/models when ready
             r2 = requests.get(f"{LLAMA_URL}/v1/models", timeout=2)
             if r2.status_code == 200:
                 log("llama-server ready (via /v1/models)")
@@ -105,12 +107,12 @@ def wait_for_llama(timeout=300):
             pass
         if llama_proc and llama_proc.poll() is not None:
             log(f"llama-server exited with code {llama_proc.returncode}")
-            raise RuntimeError("llama-server crashed on startup - check VRAM / MODEL_PATH")
+            raise RuntimeError("llama-server crashed")
         time.sleep(1)
     raise TimeoutError("llama-server did not become ready in time")
 
 
-# --- Init at import (runs during worker warmup, not per request) ---
+# ── Init (runs during worker warmup) ────────────────────────────────
 try:
     download_model_if_needed()
     start_llama_server()
@@ -119,16 +121,12 @@ except Exception as e:
     log(f"Init failed: {e}")
     raise
 
-# --- Request handling ---
 
+# ── Request handling ────────────────────────────────────────────────
 def proxy_chat_completions(payload: dict):
-    """Forward to llama-server /v1/chat/completions"""
-    # Ensure model field matches what llama-server expects if not provided
     if "model" not in payload:
         payload["model"] = MODEL_NAME
-    # Tiel recommended: temperature 0.6 for agentic coding, 1.0 default
-    # Don't override if caller provided
-    resp = requests.post(f"{LLAMA_URL}/v1/chat/completions", json=payload, timeout=300)
+    resp = requests.post(f"{LLAMA_URL}/v1/chat/completions", json=payload, timeout=600)
     resp.raise_for_status()
     return resp.json()
 
@@ -136,22 +134,14 @@ def proxy_chat_completions(payload: dict):
 def proxy_completions(payload: dict):
     if "model" not in payload:
         payload["model"] = MODEL_NAME
-    resp = requests.post(f"{LLAMA_URL}/v1/completions", json=payload, timeout=300)
+    resp = requests.post(f"{LLAMA_URL}/v1/completions", json=payload, timeout=600)
     resp.raise_for_status()
     return resp.json()
 
 
 def handler(event):
-    """
-    Runpod handler. Supports:
-    - {"input": {"messages": [...], "temperature": 0.6, ...}}  -> chat
-    - {"input": {"prompt": "..."}} -> completions
-    - {"input": {"path": "/v1/chat/completions", "payload": {...}}} (zeeb0tt style)
-    - {"input": {"openai": {"messages": [...]}}} (alternate)
-    """
     try:
         inp = event.get("input", {}) if isinstance(event, dict) else {}
-        # Compat: sometimes Runpod wraps openai path
         if "payload" in inp and "path" in inp:
             path = inp.get("path", "")
             payload = inp.get("payload", {})
@@ -159,25 +149,16 @@ def handler(event):
                 return proxy_chat_completions(payload)
             if "completions" in path:
                 return proxy_completions(payload)
-            # fallback
             return proxy_chat_completions(payload)
-
-        # Direct OpenAI shape passed as input
         if "messages" in inp:
             return proxy_chat_completions(inp)
         if "prompt" in inp:
-            # Heuristic: if prompt looks like chat, still use chat
             return proxy_completions(inp)
         if "openai" in inp and isinstance(inp["openai"], dict):
             return proxy_chat_completions(inp["openai"])
-
-        # If input is empty, return health
         if not inp:
             return {"status": "ok", "model": MODEL_NAME, "llama": LLAMA_URL}
-
-        # Fallback: treat whole input as chat payload
         return proxy_chat_completions(inp)
-
     except requests.HTTPError as e:
         body = e.response.text[:2000] if e.response is not None else str(e)
         log(f"Upstream error: {body}")

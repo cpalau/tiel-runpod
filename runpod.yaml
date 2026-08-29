@@ -1,0 +1,49 @@
+# Runpod Serverless Endpoint Config - Tiel-Coder-35B-A3B UD-Q4_K_XL
+# Crea el endpoint en console.runpod.io con estos valores
+
+name: tiel-coder-q4xl
+type: QUEUE
+
+# GPU: A100 80GB (principal) + fallback RTX PRO 6000 96GB + H100 80GB
+gpu_types:
+  - AMPERE_80        # A100 80GB ($2.74/h activo)
+  - ADA_6000_PRO     # RTX PRO 6000 96GB ($4.00/h)
+  - HOPPER_80        # H100 80GB ($4.18/h)
+
+# Workers
+workers_min: 0          # Scale-to-zero: $0 idle
+workers_max: 2          # Máximo 2 workers en paralelo
+idle_timeout: 5         # 5s antes de scale-down
+
+# Auto-scaling
+scaler_type: QUEUE_DELAY
+scaler_value: 2         # 2s queue delay threshold (más rápido que default 4)
+
+# Storage
+container_disk: 60      # 60GB para modelo + CUDA + handler
+network_volume: /runpod-volume  # Persistent storage para modelo
+
+# FlashBoot: cold start rápido
+flashboot: FLASHBOOT
+
+# Timeout por request
+timeout: 600000         # 600s (10min) para requests largos
+
+# Environment variables
+env:
+  MODEL_URL: https://huggingface.co/peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF/resolve/main/Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf
+  MODEL_FILENAME: Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf
+  MODEL_DIR: /runpod-volume
+  MODEL_NAME: Tiel-Coder-35B-A3B-UD-Q4_K_XL
+  CONTEXT_LENGTH: "262144"
+  LLAMA_SERVER_PORT: "8000"
+  FLASH_ATTENTION: "1"
+  SPLIT_MODE: "2"
+  CACHE_QUANTIZATION: q8_0
+  MAX_NUM_SEQS: "4"
+  LLAMA_EXTRA_ARGS: "--flash-attn --split-mode 2"
+
+# Build
+github_repo: cpalau/tiel-runpod
+github_branch: main
+dockerfile_path: Dockerfile
