@@ -17,4 +17,16 @@ PAYLOAD=$(cat <<JSON
 JSON
 )
 echo "Creando Pod Tiel ghcr latest..."
-curl -s -X POST https://api.runpod.io/v2/pods -H "Authorization: Bearer ${KEY}" -H "Content-Type: application/json" -d "$PAYLOAD" | python3 -m json.tool | head -n 30
+RESP=$(curl -s -X POST https://api.runpod.io/v2/pods -H "Authorization: Bearer ${KEY}" -H "Content-Type: application/json" -d "$PAYLOAD")
+echo "$RESP" | python3 -m json.tool 2>&1 | head -n 80
+POD_ID=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id','') or d.get('pod',{}).get('id',''))" 2>/dev/null || echo "")
+if [ -n "$POD_ID" ]; then
+  echo ""
+  echo "POD_ID=$POD_ID"
+  echo "Espera a RUNNING (descarga 22.4GB, 2-3 min):"
+  echo "  curl -H \"Authorization: Bearer \$RUNPOD_API_KEY\" https://api.runpod.io/v2/pods/${POD_ID} | jq .desiredStatus"
+  echo "Cuando esté RUNNING:"
+  echo "  curl https://${POD_ID}-8080.proxy.runpod.net/v1/models"
+  echo "  curl https://${POD_ID}-8080.proxy.runpod.net/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"tiel-coder\",\"messages\":[{\"role\":\"user\",\"content\":\"hola\"}],\"temperature\":0.6,\"max_tokens\":100}'"
+  echo "Para parar: pod/stop-pod.sh ${POD_ID}"
+fi
