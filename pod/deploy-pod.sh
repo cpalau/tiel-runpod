@@ -6,8 +6,6 @@ set -e
 # Requiere: ~/.secrets/runpod_api_key  o  export RUNPOD_API_KEY
 
 GPU_TYPE="${1:-NVIDIA A100-SXM4-80GB}"
-VOL_ID="l1lelwqilk"
-DC_ID="EU-RO-1"
 
 if [ -n "$RUNPOD_API_KEY" ]; then KEY="$RUNPOD_API_KEY"
 elif [ -f ~/.secrets/runpod_api_key ]; then KEY="$(cat ~/.secrets/runpod_api_key | tr -d '\n')"
@@ -18,23 +16,21 @@ PAYLOAD=$(cat <<JSON
   "name": "tiel-coder-pod",
   "image": "greyul/runpod-llama-cpp-cuda:latest",
   "gpu": { "id": "${GPU_TYPE}", "count": 1 },
-  "dataCenterIds": ["${DC_ID}"],
-  "disk": 20,
-  "mounts": { "network": [{ "volumeId": "${VOL_ID}", "path": "/runpod-volume" }] },
+  "disk": 60,
   "ports": ["8080/http", "22/tcp"],
   "env": {
     "HF_REPO": "peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF",
     "HF_FILE": "Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf",
-    "MODELS_DIR": "/runpod-volume/models",
+    "MODELS_DIR": "/workspace/models",
     "LLAMA_ARG_HOST": "0.0.0.0",
     "LLAMA_ARG_PORT": "8080",
-    "LLAMA_ARGS": "-ngl 99 --jinja --context-size 262144"
+    "LLAMA_ARGS": "-ngl 99 --jinja --ctx-size 262144"
   }
 }
 JSON
 )
 
-echo "Creando Pod tiel-coder-pod con ${GPU_TYPE} en ${DC_ID}..."
+echo "Creando Pod tiel-coder-pod con ${GPU_TYPE} (disk 60GB, sin volumen — EU-RO-1 sin stock)..."
 RESP=$(curl -s -X POST https://api.runpod.io/v2/pods \
   -H "Authorization: Bearer ${KEY}" -H "Content-Type: application/json" -d "$PAYLOAD")
 

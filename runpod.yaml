@@ -34,15 +34,13 @@ serverless:
 pod:
   name: tiel-coder-pod
   image: greyul/runpod-llama-cpp-cuda:latest
-  gpu: { id: NVIDIA A100-SXM4-80GB, count: 1 }  # $1.59/h MEDIUM — 80GB para 262k holgado
-  dataCenterIds: [EU-RO-1]
-  disk: 20
-  mounts: { network: [{ volumeId: l1lelwqilk, path: /runpod-volume }] }
+  gpu: { id: NVIDIA A100-SXM4-80GB, count: 1 }  # $1.59/h — 80GB para 262k holgado
+  disk: 60  # 60GB para GGUF 22.4GB + cache, sin network volume (EU-RO-1 sin stock A100)
   ports: ["8080/http", "22/tcp"]
   env:
     HF_REPO: peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF
     HF_FILE: Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf
-    MODELS_DIR: /runpod-volume/models
+    MODELS_DIR: /workspace/models
     LLAMA_ARG_HOST: "0.0.0.0"
     LLAMA_ARG_PORT: "8080"
-    LLAMA_ARGS: "-ngl 99 --jinja --context-size 262144"
+    LLAMA_ARGS: "-ngl 99 --jinja --ctx-size 262144"
