@@ -1,10 +1,9 @@
 #!/bin/bash
 set -e
-# Deploy Pod real — Tiel-Coder Q4_K_XL con greyul + A100 80GB (ver runpod.yaml)
+# Deploy Pod real — Tiel-Coder Q4_K_XL con greyul (simple, probado) + A100 80GB
+# Para Pod no usamos eniewold (serverless handler) sino greyul que expone 8080 directo.
 # Uso: pod/deploy-pod.sh  [GPU_TYPE_ID]
 # Requiere: ~/.secrets/runpod_api_key  o  export RUNPOD_API_KEY
-# GPU por defecto: NVIDIA A100-SXM4-80GB ($1.59/h, MEDIUM). Alternativas:
-#   "NVIDIA A40" ($0.44/h), "NVIDIA RTX PRO 6000 Blackwell Server Edition" ($2.09/h, 96GB)
 
 GPU_TYPE="${1:-NVIDIA A100-SXM4-80GB}"
 VOL_ID="l1lelwqilk"
@@ -48,10 +47,8 @@ if [ -n "$POD_ID" ]; then
   echo "POD_ID=$POD_ID"
   echo "Espera a RUNNING (~2-3 min, primera vez descarga 22.4GB a volumen):"
   echo "  curl -H \"Authorization: Bearer \$RUNPOD_API_KEY\" https://api.runpod.io/v2/pods/${POD_ID} | jq .desiredStatus"
-  echo ""
-  echo "Cuando esté RUNNING, prueba:"
-  echo "  curl http://\${POD_ID}-8080.proxy.runpod.net/v1/models"
-  echo "  curl http://\${POD_ID}-8080.proxy.runpod.net/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"tiel-coder\",\"messages\":[{\"role\":\"user\",\"content\":\"hola\"}],\"temperature\":0.6,\"max_tokens\":100}'"
-  echo ""
-  echo "Para parar y no pagar idle: pod/stop-pod.sh ${POD_ID}"
+  echo "Cuando esté RUNNING:"
+  echo "  curl http://${POD_ID}-8080.proxy.runpod.net/v1/models"
+  echo "  curl http://${POD_ID}-8080.proxy.runpod.net/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"tiel-coder\",\"messages\":[{\"role\":\"user\",\"content\":\"hola\"}],\"temperature\":0.6,\"max_tokens\":100}'"
+  echo "Para parar: pod/stop-pod.sh ${POD_ID}"
 fi

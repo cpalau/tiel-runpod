@@ -1,0 +1,33 @@
+{
+    "tests": [
+        {
+            "name": "execute_a_prompt",
+            "input": {
+                "prompt": "Hi! Who are you?"
+            },
+            "timeout": 60000
+        }
+    ],
+    "config": {
+        "gpuTypeId": "NVIDIA GeForce RTX 4090",
+        "gpuCount": 1,
+        "env": [
+            {
+                "key": "LLAMA_ARG_HF_REPO",
+                "value": "unsloth/gemma-3-270m-it-GGUF:Q6_K"
+            },
+            {
+                "key": "LLAMA_ARG_CTX_SIZE",
+                "value": "2048"
+            },
+            {
+                "key": "LLAMA_ARG_N_GPU_LAYERS",
+                "value": "999"
+            }
+        ],
+        "allowedCudaVersions": [
+            "12.8",
+            "12.9"
+        ]
+    }
+}
