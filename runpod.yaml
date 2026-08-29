@@ -33,14 +33,15 @@ serverless:
 # ── Pod (24/7, sin cold start) ──────────────────────────────────────
 pod:
   name: tiel-coder-pod
-  image: greyul/runpod-llama-cpp-cuda:latest
+  image: cpalau/tiel-runpod:eniewold  # eniewold base (igual que serverless) — handler en 3098
   gpu: { id: NVIDIA A100-SXM4-80GB, count: 1 }  # $1.59/h — 80GB para 262k holgado
-  disk: 60  # 60GB para GGUF 22.4GB + cache, sin network volume (EU-RO-1 sin stock A100)
-  ports: ["8080/http", "22/tcp"]
+  disk: 60
+  ports: ["3098/http", "22/tcp"]
   env:
-    HF_REPO: peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF
-    HF_FILE: Tiel-Coder-35B-A3B-UD-Q4_K_XL.gguf
-    MODELS_DIR: /workspace/models
-    LLAMA_ARG_HOST: "0.0.0.0"
-    LLAMA_ARG_PORT: "8080"
-    LLAMA_ARGS: "-ngl 99 --jinja --ctx-size 262144"
+    LLAMA_ARG_HF_REPO: peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF
+    LLAMA_HF_QUANT: UD-Q4_K_XL
+    LLAMA_ARG_CTX_SIZE: "262144"
+    LLAMA_ARG_N_PARALLEL: "1"
+    LLAMA_ARG_N_GPU_LAYERS: "999"
+    LLAMA_ARG_N_CPU_MOE: "0"
+    LLAMA_ARG_FLASH_ATTN: auto
