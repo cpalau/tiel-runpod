@@ -2,12 +2,11 @@
 # Base: https://github.com/eniewold/llama-cpp-runpod (ghcr.io/ggml-org/llama.cpp:server-cuda)
 # Imagen Docker se buildea desde ./Dockerfile + ./src (no hay pull de ghcr directo)
 
-# ── Serverless ──────────────────────────────────────────────────────
+# ── Serverless (eniewold) ─────────────────────────────────────────
 serverless:
   name: tiel-coder-q4xl
   type: QUEUE
-  # Build desde GitHub (Runpod Hub): tu repo cpalau/tiel-runpod, Dockerfile en root
-  image: cpalau/tiel-runpod:eniewold  # o usa hub listing eniewold/llama-cpp-runpod con env de abajo
+  image: cpalau/tiel-runpod:eniewold
   gpu_pools:
     - AMPERE_80      # A100 80GB  $2.72/h serverless
     - BLACKWELL_96   # RTX PRO 6000 96GB $3.49/h
@@ -31,16 +30,11 @@ serverless:
     LLAMA_ARG_FLASH_ATTN: auto
     # Para YaRN 1M: LLAMA_ARG_CTX_SIZE=1048576 + LLAMA_SERVER_CMD_ARGS=--rope-scaling yarn ...
 
-# ── Pod (alternativa 24/7) ─────────────────────────────────────────
-# Pod no usa eniewold (serverless handler). Para Pod usa imagen greyul o llama.cpp directa.
-# API real: POST /v2/pods {name, image, gpu:{id,count}, disk, ports:[], mounts:{network:[]}, dataCenterIds:[], env}
+# ── Pod (24/7, sin cold start) ──────────────────────────────────────
 pod:
   name: tiel-coder-pod
-  # Opción Pod 1: greyul (probada, simple, OpenAI en 8080)
   image: greyul/runpod-llama-cpp-cuda:latest
-  # Opción Pod 2: ghcr.io/ggml-org/llama.cpp:server-cuda + manual llama-server
   gpu: { id: NVIDIA A100-SXM4-80GB, count: 1 }  # $1.59/h MEDIUM — 80GB para 262k holgado
-  # Alternativas Pod: NVIDIA A40 ($0.44/h, 48GB snug), NVIDIA RTX PRO 6000 Blackwell Server Edition ($2.09/h, 96GB HIGH)
   dataCenterIds: [EU-RO-1]
   disk: 20
   mounts: { network: [{ volumeId: l1lelwqilk, path: /runpod-volume }] }
